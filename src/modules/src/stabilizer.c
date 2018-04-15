@@ -44,6 +44,8 @@
 #include "estimator_kalman.h"
 #include "estimator.h"
 
+#include "pm.h"
+
 static bool isInit;
 static bool emergencyStop = false;
 static int emergencyStopTimeout = EMERGENCY_STOP_TIMEOUT_DISABLED;
@@ -53,6 +55,8 @@ static setpoint_t setpoint;
 static sensorData_t sensorData;
 static state_t state;
 static control_t control;
+
+const float LOW_BATTERY = 3.3f;
 
 static void stabilizerTask(void* param);
 
@@ -134,6 +138,10 @@ static void stabilizerTask(void* param)
     stateController(&control, &setpoint, &sensorData, &state, tick);
 
     checkEmergencyStopTimeout();
+
+    // Perform emergency stop is battery level is too low!
+    // Or the battery might be damaged.
+    emergencyStop |= pmGetBatteryVoltageMin() < LOW_BATTERY;
 
     if (emergencyStop) {
       powerStop();
