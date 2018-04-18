@@ -44,6 +44,7 @@
 #include "estimator_kalman.h"
 #include "estimator.h"
 
+#include "motors.h"
 #include "pm.h"
 
 static bool isInit;
@@ -108,6 +109,28 @@ static void checkEmergencyStopTimeout()
  * (ie. returning without modifying the output structure).
  */
 
+#define YAW_CONTROL_MODE
+#ifdef YAW_CONTROL_MODE
+static int yawCtrlMode = 0;      /* 0 is inactive, higher numbers for different modes of control */
+static float yawCtrlBase = 0.0; /* When the control is active, we let all motors get this PWM duty cycle signal as a base. This value should be 0-1 */
+static float yawCtrlKP = 0;    /* P gain in the PID */
+static float yawCtrlKI = 0;      /* I gain in the PID */
+static float yawCtrlKD = 0;   /* D gain in the PID */
+static float yawCtrlRef = 10;    /* The reference/target yaw angle in degrees */
+#endif
+
+static float limitDutyCycle(float u)
+{
+  // Props cannot turn the other way
+  if (u < 0) u = 0;
+
+  // Make sure they do not spin so fast that the drone lifts
+  float maxDuty = 0.6;
+  if (u > maxDuty) u = maxDuty;
+
+  return u;
+}
+
 static void stabilizerTask(void* param)
 {
   uint32_t tick;
@@ -149,6 +172,58 @@ static void stabilizerTask(void* param)
       powerDistribution(&control);
     }
 
+    // Switch sign of reference point every N ticks.
+    // This allows us to test the controller without having to
+    // touch the drone to change its angle or enter different reference
+    // values
+    if (tick % 3000 == 0) {
+      yawCtrlRef = -yawCtrlRef;
+    }
+
+    // Calculate the control error and make sure that the angle error stays
+    // within the interval (-180,180]. Otherwise, you might get error 350 degs
+    // when the reference signal is 175 and the current yaw is -175, when
+    // in fact the error is -10.
+    float error = yawCtrlRef - state.attitude.yaw;
+    if (error > 180) error -= 360;
+    if (error < -180) error += 360;
+
+    // Here we can defien a number of different controllers (modes).
+    // mode=0 is assumed to refer to the case where you do not do anything
+    if (yawCtrlMode == 1) {
+      // In what fallows it is assumed that we work with the duty cycle,
+      // i.e. a number between 0 and 1 as the control signal.
+      // We will then map that to the PWM values 0-65535 at the end.
+
+      // The following 4 lines will make all props spin with the same
+      // speed, defined by the parameter yawCtrlBase (0-1) which you can set in
+      // the Parameter tab.
+      //
+      // YOU JOB IS TO CHANGE THIS INTO A FEEDBACK CONTROLLER
+      //
+      // You yawCtrlRef value, i.e. to get error=0
+      // The main aiom here is to show that you can use the output from the
+      // system
+      float u0 = yawCtrlBase;
+      float u1 = yawCtrlBase;
+      float u2 = yawCtrlBase;
+      float u3 = yawCtrlBase;
+
+      // Limit the control signals to ensure that they are
+      // i) valid and ii) does not make the drone fly away
+      u0 = limitDutyCycle(u0);
+      u1 = limitDutyCycle(u1);
+      u2 = limitDutyCycle(u2);
+      u3 = limitDutyCycle(u3);
+
+      // Map the control signals from numbers 0-1 to 0-65535, and send to motors
+      motorsSetRatio(0, (int)(u0 * 65535));
+      motorsSetRatio(1, (int)(u1 * 65535));
+      motorsSetRatio(2, (int)(u2 * 65535));
+      motorsSetRatio(3, (int)(u3 * 65535));
+    }
+
+
     tick++;
   }
 }
@@ -168,6 +243,22 @@ void stabilizerSetEmergencyStopTimeout(int timeout)
   emergencyStop = false;
   emergencyStopTimeout = timeout;
 }
+
+PARAM_GROUP_START(yawCtrlPar)
+PARAM_ADD(PARAM_UINT8, mYawCtrlMode, &yawCtrlMode)
+PARAM_ADD(PARAM_FLOAT, myawCtrlBase, &yawCtrlBase)
+PARAM_ADD(PARAM_FLOAT, mYawCtrlKP, &yawCtrlKP)
+PARAM_ADD(PARAM_FLOAT, mYawCtrlKI, &yawCtrlKI)
+PARAM_ADD(PARAM_FLOAT, mYawCtrlKD, &yawCtrlKD)
+PARAM_ADD(PARAM_FLOAT, mYawCtrlRef, &yawCtrlRef)
+PARAM_GROUP_STOP(yawCtrlPar)
+
+LOG_GROUP_START(yawCtrlLog)
+LOG_ADD(LOG_UINT8, lYawCtrlMode, &yawCtrlMode)
+LOG_ADD(LOG_FLOAT, lYaw, &state.attitude.yaw)
+LOG_ADD(LOG_FLOAT, lYawRef, &yawCtrlRef)
+LOG_ADD(LOG_FLOAT, lYaw, &state.attitude.yaw)
+LOG_GROUP_STOP(yawCtrlLog)
 
 LOG_GROUP_START(ctrltarget)
 LOG_ADD(LOG_FLOAT, roll, &setpoint.attitude.roll)
