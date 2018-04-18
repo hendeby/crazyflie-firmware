@@ -113,12 +113,12 @@ static void checkEmergencyStopTimeout()
 #ifdef YAW_CONTROL_MODE
 static int yawCtrlMode = 0;  /* 0 is inactive, higher numbers for different
                               modes of control */
-static float yawCtrlOffset = 0.0;  /* When the control is active, we let all
+static float yawCtrlOffset = 0.25;  /* When the control is active, we let all
                                     motors get this PWM duty cycle signal as
                                     a base. This value should be 0-1 */
-static float yawCtrlKP = 0;  /* P gain in the PID */
+static float yawCtrlKP = 0.2;  /* P gain in the PID */
 static float yawCtrlKI = 0;  /* I gain in the PID */
-static float yawCtrlKD = 0;  /* D gain in the PID */
+static float yawCtrlKD = 0.02;  /* D gain in the PID */
 static float yawCtrlRef = 10;  /* The reference/target yaw angle in degrees */
 static float yawU = 0;  /* Control signal for yaw control. */
 static float yawError = 0;  /* Yaw control error. */
@@ -166,6 +166,10 @@ static void stabilizerTask(void* param)
   // Initialize tick to something else then 0
   tick = 1;
   
+
+#ifdef YAW_CONTROL_MODE
+  float yawCtrlIntSum = 0.f;
+#endif
   while(1) {
     vTaskDelayUntil(&lastWakeTime, F2T(RATE_MAIN_LOOP));
 
@@ -208,30 +212,31 @@ static void stabilizerTask(void* param)
     // We set the control signal to 0 to start with
     float u[4] = { 0., 0., 0., 0. };
     if (yawCtrlMode == 1) {
-      // The following 4 lines will make all props spin with the same
-      // speed, defined by the parameter yawCtrlOffset which you can set in
-      // the Parameter tab.
-      //
-      // You can use this controller by etting yawCtrlMode to 1 in the
-      // Parameter tab in the Crazyflie Client
-      u[0] = yawCtrlOffset;
-      u[1] = yawCtrlOffset;
-      u[2] = yawCtrlOffset;
-      u[3] = yawCtrlOffset;
+      const int threshold = 2;
+
+      if (yawError > threshold) {
+        yawU = yawCtrlOffset;
+      } else if (yawError < -threshold) {
+        yawU = -yawCtrlOffset;
+      } else {
+        yawU = 0;
+      }
+
+      u[0] = yawCtrlOffset - yawU;
+      u[1] = yawCtrlOffset + yawU;
+      u[2] = u[0];
+      u[3] = u[1];
     } else if (yawCtrlMode == 2) {
-      //
-      // YOUR JOB IS TO CREATE A FEEDBACK CONTROLLER here, i.e. an
-      // algorithm that makes the yawError defined above go to zero by
-      // an appropriate choice of control signals to motors M1-M4. In
-      // other words calculate u[0], ..., u[3] based on yawError and
-      // remember that the values should be 0-1, where 0 means motors
-      // completely off and 1 means max thrust.
-      //
-      // The controller should work for different values of yawCtrlRef
-      //
-      // You would activet this controller by setting yawCtrlMode to 2 in
-      // the Parameter tab in the Crazyflie Client
+      yawCtrlIntSum += yawError * 0.001f;
+      yawU = yawCtrlKP * yawError + yawCtrlKI * yawCtrlIntSum - yawCtrlKD * sensorData.gyro.z;
+
+      u[0] = yawCtrlOffset - yawU;
+      u[1] = yawCtrlOffset + yawU;
+      u[2] = u[0];
+      u[3] = u[1];
     }
+    if (yawCtrlMode != 2) // Reset PID integral error if PID not in use
+      yawCtrlIntSum = 0.f;
 #endif
 
     checkEmergencyStopTimeout();
