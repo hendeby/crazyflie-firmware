@@ -162,6 +162,8 @@ static void stabilizerTask(void* param)
   // Initialize tick to something else then 0
   tick = 1;
 
+  float yawCtrlIntSum = 0.0;
+  
   while(1) {
     vTaskDelayUntil(&lastWakeTime, F2T(RATE_MAIN_LOOP));
 
@@ -207,17 +209,26 @@ static void stabilizerTask(void* param)
       // The following 4 lines will make all props spin with the same
       // speed, defined by the parameter yawCtrlOffset which you can set in
       // the Parameter tab.
+      //
+      // You can use this controller by etting yawCtrlMode to 1 in the
+      // Parameter tab in the Crazyflie Client
       u[0] = yawCtrlOffset;
       u[1] = yawCtrlOffset;
       u[2] = yawCtrlOffset;
       u[3] = yawCtrlOffset;
-
+    } else if (yawCtrlMode == 2) {
       //
-      // YOUR JOB IS TO CHANGE THIS INTO A FEEDBACK CONTROLLER, i.e. an
+      // YOUR JOB IS TO CREATE A FEEDBACK CONTROLLER here, i.e. an
       // algorithm that makes the yawError defined above go to zero by
-      // an appropriate choice of control signals to motors M1-M4.
+      // an appropriate choice of control signals to motors M1-M4. In other
+      // words calculate u[0], ..., u[3] based on yawError and remember that the
+      // values should be 0-1, where 0 means motors completely off and 1 means
+      // max thrust.
       //
       // The controller should work for different values of yawCtrlRef
+      //
+      // You would activet this controller by setting yawCtrlMode to 2 in
+      // the Parameter tab in the Crazyflie Client
     }
 #endif
 
