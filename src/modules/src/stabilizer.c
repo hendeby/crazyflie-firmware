@@ -112,7 +112,7 @@ static void checkEmergencyStopTimeout()
 #define YAW_CONTROL_MODE
 #ifdef YAW_CONTROL_MODE
 static int yawCtrlMode = 0;  /* 0 is inactive, higher numbers for different modes of control */
-static float yawCtrlBase = 0.0;  /* When the control is active, we let all motors get this PWM duty cycle signal as a base. This value should be 0-1 */
+static float yawCtrlOffset = 0.0;  /* When the control is active, we let all motors get this PWM duty cycle signal as a base. This value should be 0-1 */
 static float yawCtrlKP = 0;  /* P gain in the PID */
 static float yawCtrlKI = 0;  /* I gain in the PID */
 static float yawCtrlKD = 0;  /* D gain in the PID */
@@ -162,6 +162,8 @@ static void stabilizerTask(void* param)
   // Initialize tick to something else then 0
   tick = 1;
 
+  float yawCtrlIntSum = 0.0;
+  
   while(1) {
     vTaskDelayUntil(&lastWakeTime, F2T(RATE_MAIN_LOOP));
 
@@ -195,21 +197,38 @@ static void stabilizerTask(void* param)
 
     // Here we can define a number of different controllers (modes).
     // mode=0 is assumed to refer to the case where you do not do anything
-    float u[4] = { yawCtrlBase, yawCtrlBase, yawCtrlBase, yawCtrlBase };
-    if (yawCtrlMode == 1) {
-      // In what follows it is assumed that we work with the duty cycle,
-      // i.e. a number between 0 and 1 as the control signal.
-      // We will then map that to the PWM values 0-65535 at the end.
 
+    // The putput of our controller will be put into the array u.
+    // It is assumed that we work with the duty cycle, i.e. a number between
+    // 0 and 1 as the control signal. This will then map that to the
+    // PWM values 0-65535 at the end.
+    //
+    // We set the control signal to 0 to start with
+    float u[4] = { 0., 0., 0., 0. };
+    if (yawCtrlMode == 1) {
       // The following 4 lines will make all props spin with the same
-      // speed, defined by the parameter yawCtrlBase (0-1) which you can set in
+      // speed, defined by the parameter yawCtrlOffset which you can set in
       // the Parameter tab.
       //
-      // YOU JOB IS TO CHANGE THIS INTO A FEEDBACK CONTROLLER
+      // You can use this controller by etting yawCtrlMode to 1 in the
+      // Parameter tab in the Crazyflie Client
+      u[0] = yawCtrlOffset;
+      u[1] = yawCtrlOffset;
+      u[2] = yawCtrlOffset;
+      u[3] = yawCtrlOffset;
+    } else if (yawCtrlMode == 2) {
       //
-      // You yawCtrlRef value, i.e. to get yawError = 0
-      // The main aiom here is to show that you can use the output from the
-      // system
+      // YOUR JOB IS TO CREATE A FEEDBACK CONTROLLER here, i.e. an
+      // algorithm that makes the yawError defined above go to zero by
+      // an appropriate choice of control signals to motors M1-M4. In other
+      // words calculate u[0], ..., u[3] based on yawError and remember that the
+      // values should be 0-1, where 0 means motors completely off and 1 means
+      // max thrust.
+      //
+      // The controller should work for different values of yawCtrlRef
+      //
+      // You would activet this controller by setting yawCtrlMode to 2 in
+      // the Parameter tab in the Crazyflie Client
     }
 #endif
 
@@ -251,7 +270,7 @@ void stabilizerSetEmergencyStopTimeout(int timeout)
 #ifdef YAW_CONTROL_MODE
 PARAM_GROUP_START(yawCtrlPar)
 PARAM_ADD(PARAM_UINT8, mYawCtrlMode, &yawCtrlMode)
-PARAM_ADD(PARAM_FLOAT, myawCtrlBase, &yawCtrlBase)
+PARAM_ADD(PARAM_FLOAT, myawCtrlOffset, &yawCtrlOffset)
 PARAM_ADD(PARAM_FLOAT, mYawCtrlKP, &yawCtrlKP)
 PARAM_ADD(PARAM_FLOAT, mYawCtrlKI, &yawCtrlKI)
 PARAM_ADD(PARAM_FLOAT, mYawCtrlKD, &yawCtrlKD)
