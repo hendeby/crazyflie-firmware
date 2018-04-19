@@ -111,8 +111,11 @@ static void checkEmergencyStopTimeout()
 
 #define YAW_CONTROL_MODE
 #ifdef YAW_CONTROL_MODE
-static int yawCtrlMode = 0;  /* 0 is inactive, higher numbers for different modes of control */
-static float yawCtrlOffset = 0.0;  /* When the control is active, we let all motors get this PWM duty cycle signal as a base. This value should be 0-1 */
+static int yawCtrlMode = 0;  /* 0 is inactive, higher numbers for different
+                              modes of control */
+static float yawCtrlOffset = 0.0;  /* When the control is active, we let all
+                                    motors get this PWM duty cycle signal as
+                                    a base. This value should be 0-1 */
 static float yawCtrlKP = 0;  /* P gain in the PID */
 static float yawCtrlKI = 0;  /* I gain in the PID */
 static float yawCtrlKD = 0;  /* D gain in the PID */
@@ -127,7 +130,8 @@ void yawPowerDistribution(const float u[4]) {
   // Limit the control signals to ensure that they are
   // i)  valid and
   // ii) does not make the drone fly away
-  // Then map the control signals from numbers 0-1 to 0-65535, and send to motors
+  // Then map the control signals from numbers 0-1 to 0-65535,
+  // and send to motors
   for (int i=0; i<4; ++i)
     motorsSetRatio(i, (int16_t) (65535*limitDutyCycle(u[i])));
 }
@@ -218,10 +222,10 @@ static void stabilizerTask(void* param)
       //
       // YOUR JOB IS TO CREATE A FEEDBACK CONTROLLER here, i.e. an
       // algorithm that makes the yawError defined above go to zero by
-      // an appropriate choice of control signals to motors M1-M4. In other
-      // words calculate u[0], ..., u[3] based on yawError and remember that the
-      // values should be 0-1, where 0 means motors completely off and 1 means
-      // max thrust.
+      // an appropriate choice of control signals to motors M1-M4. In
+      // other words calculate u[0], ..., u[3] based on yawError and
+      // remember that the values should be 0-1, where 0 means motors
+      // completely off and 1 means max thrust.
       //
       // The controller should work for different values of yawCtrlRef
       //
