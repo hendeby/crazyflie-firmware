@@ -161,8 +161,6 @@ static void stabilizerTask(void* param)
   }
   // Initialize tick to something else then 0
   tick = 1;
-
-  float yawCtrlIntSum = 0.0;
   
   while(1) {
     vTaskDelayUntil(&lastWakeTime, F2T(RATE_MAIN_LOOP));
